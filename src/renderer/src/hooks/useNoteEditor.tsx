@@ -1,6 +1,6 @@
 import { useCallback, useRef, useEffect } from 'react'
 import { MDXEditorMethods } from '@mdxeditor/editor'
-import { debounce } from 'lodash' // Make sure to install lodash if not already present
+import { debounce } from 'lodash'
 
 type Note = {
   id: string

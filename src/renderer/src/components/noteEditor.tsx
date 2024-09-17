@@ -7,7 +7,19 @@ import {
   markdownShortcutPlugin,
   quotePlugin,
   imagePlugin,
-  thematicBreakPlugin
+  linkDialogPlugin,
+  linkPlugin,
+  thematicBreakPlugin,
+  frontmatterPlugin,
+  tablePlugin,
+  toolbarPlugin,
+  AdmonitionDirectiveDescriptor,
+  directivesPlugin,
+  InsertImage,
+  InsertThematicBreak,
+  InsertCodeBlock,
+  DirectiveDescriptor,
+  GenericDirectiveEditor
 } from '@mdxeditor/editor'
 import { useNoteEditor } from '@renderer/hooks/useNoteEditor'
 
@@ -22,7 +34,6 @@ type NoteEditorProps = {
   onNoteUpdate: (updatedNote: Note) => void
 }
 
-// Image upload handler function for Electron renderer
 async function imageUploadHandler(file: File): Promise<string> {
   console.log(file)
   return new Promise((resolve, reject) => {
@@ -30,7 +41,6 @@ async function imageUploadHandler(file: File): Promise<string> {
     reader.onload = async (event) => {
       if (event.target?.result) {
         try {
-          // Use the exposed ipcRenderer to communicate with the main process
           const filePath = await window.electron.ipcRenderer.invoke('save-image', {
             name: file.name,
             data: event.target.result
@@ -53,8 +63,9 @@ export function NoteEditor({ note, onNoteUpdate }: NoteEditorProps) {
     <div className="flex-grow overflow-auto">
       <MDXEditor
         ref={editorRef}
-        className="h-full prose prose-slate dark:prose-code:text-red-400 prose-code:text-red-700 dark:prose-invert max-w-none prose-sm"
+        className="h-full prose prose-slate dark:prose-code:text-red-400 prose-code:text-red-700 dark:prose-invert max-w-none "
         markdown={note.content}
+        key={note.id}
         onChange={handleContentChange}
         plugins={[
           headingsPlugin(),
@@ -62,8 +73,21 @@ export function NoteEditor({ note, onNoteUpdate }: NoteEditorProps) {
           quotePlugin(),
           thematicBreakPlugin(),
           markdownShortcutPlugin(),
-          codeBlockPlugin(),
-          imagePlugin({ imageUploadHandler })
+          linkPlugin(),
+          linkDialogPlugin(),
+          imagePlugin({ imageUploadHandler }),
+          frontmatterPlugin(),
+          tablePlugin(),
+          directivesPlugin({ directiveDescriptors: [AdmonitionDirectiveDescriptor] }),
+          toolbarPlugin({
+            toolbarContents: () => (
+              <>
+                <InsertImage />
+                <InsertThematicBreak />
+                {/* Add other toolbar items as needed */}
+              </>
+            )
+          })
         ]}
         contentEditableClassName="outline-none px-4 py-2"
       />
