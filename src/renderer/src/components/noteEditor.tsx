@@ -22,6 +22,30 @@ type NoteEditorProps = {
   onNoteUpdate: (updatedNote: Note) => void
 }
 
+// Image upload handler function for Electron renderer
+async function imageUploadHandler(file: File): Promise<string> {
+  console.log(file)
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      if (event.target?.result) {
+        try {
+          // Use the exposed ipcRenderer to communicate with the main process
+          const filePath = await window.electron.ipcRenderer.invoke('save-image', {
+            name: file.name,
+            data: event.target.result
+          })
+          resolve(filePath)
+        } catch (error) {
+          reject(error)
+        }
+      }
+    }
+    reader.onerror = (error) => reject(error)
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 export function NoteEditor({ note, onNoteUpdate }: NoteEditorProps) {
   const { editorRef, handleContentChange } = useNoteEditor(note, onNoteUpdate)
 
@@ -39,7 +63,7 @@ export function NoteEditor({ note, onNoteUpdate }: NoteEditorProps) {
           thematicBreakPlugin(),
           markdownShortcutPlugin(),
           codeBlockPlugin(),
-          imagePlugin()
+          imagePlugin({ imageUploadHandler })
         ]}
         contentEditableClassName="outline-none px-4 py-2"
       />

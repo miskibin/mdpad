@@ -1,8 +1,8 @@
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { BrowserWindow, app, ipcMain, shell } from 'electron'
-import { join } from 'path'
+import path, { join } from 'path'
 import icon from '../../resources/icon.png?asset'
-
+import fs from 'fs'
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -56,7 +56,16 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
+  ipcMain.handle('save-image', async (_, { name, data }) => {
+    const imagesDir = path.join(app.getPath('userData'), 'images')
+    if (!fs.existsSync(imagesDir)) {
+      fs.mkdirSync(imagesDir, { recursive: true })
+    }
+    const fileName = `${Date.now()}-${name}`
+    const filePath = path.join(imagesDir, fileName)
+    await fs.promises.writeFile(filePath, Buffer.from(data))
+    return `file://${filePath}`
+  })
   createWindow()
 
   app.on('activate', function () {
