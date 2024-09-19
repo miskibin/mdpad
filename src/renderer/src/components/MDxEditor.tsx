@@ -1,109 +1,36 @@
-import React, { useMemo, useCallback } from 'react'
-import { createEditor, Descendant, BaseEditor, BaseRange, Text, Element, Transforms } from 'slate'
-import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
-
-type CustomElement = { type: 'paragraph' | 'code-block'; children: CustomText[] }
-type CustomText = { text: string; bold?: boolean; italic?: boolean; code?: boolean }
-type CustomEditor = BaseEditor & ReactEditor
-
-declare module 'slate' {
-  interface CustomTypes {
-    Editor: CustomEditor
-    Element: CustomElement
-    Text: CustomText
-  }
-}
-
-interface CustomRange extends BaseRange {
-  heading?: boolean
-  level?: number
-  bold?: boolean
-  italic?: boolean
-  code?: boolean
-}
-
-const initialValue: Descendant[] = [
-  {
-    type: 'paragraph',
-    children: [{ text: 'Start typing here...' }]
-  }
-]
+import React, { useMemo, useCallback, useState } from 'react'
+import { createEditor, Descendant, Element, Transforms, Editor, Range } from 'slate'
+import { Slate, Editable, withReact } from 'slate-react'
+import { CustomElement, CustomEditor, initialValue, decorateNode, serialize } from './editorUtils'
 
 interface MarkdownEditorProps {
   onContentChange?: (content: string) => void
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
-  const editor = useMemo(() => withReact(createEditor()), [])
-
-  const decorateNode = useCallback(([node, path]: [any, number[]]) => {
-    const ranges: CustomRange[] = []
-
-    if (Text.isText(node)) {
-      const { text } = node
-
-      // Heading
-      const headingMatch = text.match(/^(#{1,6})\s/)
-      if (headingMatch && path[path.length - 1] === 0) {
-        ranges.push({
-          anchor: { path, offset: 0 },
-          focus: { path, offset: text.length },
-          heading: true,
-          level: headingMatch[1].length
-        })
-      }
-
-      // Bold
-      let match
-      const boldRegex = /\*\*((?!\s)[^*]+(?<!\s))\*\*/g
-      while ((match = boldRegex.exec(text)) !== null) {
-        ranges.push({
-          anchor: { path, offset: match.index },
-          focus: { path, offset: match.index + match[0].length },
-          bold: true
-        })
-      }
-
-      // Italic
-      const italicRegex = /\*((?!\s)[^*]+(?<!\s))\*/g
-      while ((match = italicRegex.exec(text)) !== null) {
-        ranges.push({
-          anchor: { path, offset: match.index },
-          focus: { path, offset: match.index + match[0].length },
-          italic: true
-        })
-      }
-
-      // Inline code
-      const codeRegex = /`([^`\n]+)`/g
-      while ((match = codeRegex.exec(text)) !== null) {
-        ranges.push({
-          anchor: { path, offset: match.index },
-          focus: { path, offset: match.index + match[0].length },
-          code: true
-        })
-      }
-    }
-
-    return ranges
-  }, [])
+  const editor = useMemo(() => withReact(createEditor() as CustomEditor), [])
+  const [consecutiveEnters, setConsecutiveEnters] = useState(0)
 
   const renderElement = useCallback((props: any) => {
     switch (props.element.type) {
-      case 'code-block':
+      case 'quote':
         return (
-          <pre
-            {...props.attributes}
-            className="bg-gray-100 dark:bg-gray-800 rounded p-2 my-2 overflow-x-auto"
-          >
-            <code>{props.children}</code>
-          </pre>
+          <blockquote {...props.attributes} className="border-l-4 border-gray-300 pl-4 my-2 italic">
+            {props.children}
+          </blockquote>
+        )
+      case 'list-item':
+        return <li {...props.attributes}>{props.children}</li>
+      case 'list':
+        return (
+          <ul {...props.attributes} className="list-disc ml-6">
+            {props.children}
+          </ul>
         )
       default:
         return <p {...props.attributes}>{props.children}</p>
     }
   }, [])
-
   const renderLeaf = useCallback(({ attributes, children, leaf }: any) => {
     let classes = ''
 
@@ -138,49 +65,115 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
     )
   }, [])
 
-  const serialize = (nodes: Descendant[]): string => {
-    return nodes
-      .map((n) => {
-        if (Element.isElement(n) && n.type === 'code-block') {
-          return '```\n' + n.children.map((c) => (Text.isText(c) ? c.text : '')).join('') + '\n```'
-        }
-        return Element.isElement(n) ? n.children.map((c) => (Text.isText(c) ? c.text : '')).join('') : ''
-      })
-      .join('\n')
-  }
-
   const handleChange = (value: Descendant[]) => {
     const content = serialize(value)
     if (onContentChange) {
       onContentChange(content)
     }
   }
-
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    const { selection } = editor
+
     if (event.key === 'Enter') {
-      const [start] = editor.range ? [editor.range.anchor] : [null]
-      if (start) {
-        const blockEntry = editor.above({
-          match: n => Element.isElement(n) && Editor.isBlock(editor, n)
+      if (selection && Range.isCollapsed(selection)) {
+        const [match] = Editor.nodes(editor, {
+          match: (n): n is CustomElement =>
+            Element.isElement(n) && (n.type === 'list-item' || n.type === 'quote')
         })
-        if (blockEntry) {
-          const [block, path] = blockEntry
+
+        if (match) {
+          const [node, path] = match
           const start = Editor.start(editor, path)
-          const range = { anchor: start, focus: editor.selection ? editor.selection.focus : start }
+          const range = { anchor: start, focus: selection.focus }
           const text = Editor.string(editor, range)
-          const codeMatch = text.match(/^```\s*$/)
-          
-          if (codeMatch) {
+
+          if (text.trim() === '') {
             event.preventDefault()
-            Transforms.setNodes(
-              editor,
-              { type: 'code-block' },
-              { match: n => Element.isElement(n) && Editor.isBlock(editor, n) }
-            )
-            Transforms.delete(editor, { at: range })
-            return
+            if (node.type === 'list-item') {
+              if (consecutiveEnters === 1) {
+                const [parentList] = Editor.parent(editor, path)
+                if (Element.isElement(parentList) && parentList.type === 'list') {
+                  const [grandParent, grandParentPath] = Editor.parent(editor, path.slice(0, -1))
+                  if (Element.isElement(grandParent) && grandParent.type === 'list-item') {
+                    // We're in a nested list, move up one level
+                    Transforms.moveNodes(editor, {
+                      at: path,
+                      to: Path.next(grandParentPath)
+                    })
+                  } else {
+                    // We're in a top-level list, exit the list
+                    Transforms.unwrapNodes(editor, {
+                      match: (n): n is ListElement => Element.isElement(n) && n.type === 'list',
+                      split: true
+                    })
+                    Transforms.setNodes<CustomElement>(editor, { type: 'paragraph' })
+                  }
+                }
+                setConsecutiveEnters(0)
+              } else {
+                Transforms.insertNodes(editor, {
+                  type: 'list-item',
+                  children: [{ text: '' }]
+                } as ListItemElement)
+                setConsecutiveEnters(consecutiveEnters + 1)
+              }
+            } else if (node.type === 'quote') {
+              Transforms.unwrapNodes(editor, {
+                match: (n): n is CustomElement => Element.isElement(n) && n.type === 'quote',
+                split: true
+              })
+              Transforms.setNodes<CustomElement>(editor, { type: 'paragraph' })
+            }
+          } else {
+            if (node.type === 'list-item') {
+              event.preventDefault()
+              Transforms.splitNodes(editor, { always: true })
+              setConsecutiveEnters(0)
+            }
+            // For quotes, we'll let the default behavior happen
           }
+        } else {
+          // For regular paragraphs, we'll let the default behavior happen
+          setConsecutiveEnters(0)
         }
+      }
+    } else {
+      setConsecutiveEnters(0)
+    }
+
+    if (event.key === '>' && selection && Range.isCollapsed(selection)) {
+      const { anchor } = selection
+      const block = Editor.above(editor, {
+        match: (n) => Element.isElement(n) && Editor.isBlock(editor, n)
+      })
+      const path = block ? block[1] : []
+      const start = Editor.start(editor, path)
+      const range = { anchor: start, focus: anchor }
+      const beforeText = Editor.string(editor, range)
+
+      if (beforeText === '') {
+        event.preventDefault()
+        Transforms.setNodes<CustomElement>(editor, { type: 'quote' })
+      }
+    }
+
+    if (event.key === '-' && selection && Range.isCollapsed(selection)) {
+      const { anchor } = selection
+      const block = Editor.above(editor, {
+        match: (n) => Element.isElement(n) && Editor.isBlock(editor, n)
+      })
+      const path = block ? block[1] : []
+      const start = Editor.start(editor, path)
+      const range = { anchor: start, focus: anchor }
+      const beforeText = Editor.string(editor, range)
+
+      if (beforeText === '') {
+        event.preventDefault()
+        const list: ListElement = { type: 'list', children: [] }
+        const listItem: ListItemElement = { type: 'list-item', children: [{ text: '' }] }
+        Transforms.wrapNodes(editor, list)
+        Transforms.wrapNodes(editor, listItem)
+        Transforms.move(editor)
       }
     }
   }
@@ -192,7 +185,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
         renderElement={renderElement}
         renderLeaf={renderLeaf}
         onKeyDown={handleKeyDown}
-        placeholder="Type your markdown here. Use # for headings, ** for bold, * for italic, ` for inline code, and ``` for code blocks."
+        placeholder="Type your markdown here. Use # for headings, ** for bold, * for italic, ` for inline code, > for quotes, and - for list items."
         className="w-full p-4 border rounded text-gray-900 dark:text-gray-100 overflow-auto outline-none min-h-[100px] focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
       />
     </Slate>
