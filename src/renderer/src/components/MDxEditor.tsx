@@ -7,7 +7,8 @@ import {
   Editor,
   Range,
   NodeEntry,
-  BaseRange
+  BaseRange,
+  Node
 } from 'slate'
 import { Slate, Editable, withReact } from 'slate-react'
 import { withHistory } from 'slate-history'
@@ -15,7 +16,7 @@ import { CustomEditor, initialValue } from './types'
 import { decorateNode, serialize } from './utils'
 import { renderElement } from './elements'
 import { renderLeaf } from './leafs'
-import { EditorCommands } from './editorCommands'
+import { EditorCommands } from './editorcommands'
 
 interface MarkdownEditorProps {
   onContentChange?: (content: string) => void
@@ -30,6 +31,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
     if (onContentChange) {
       onContentChange(content)
     }
+    console.log('Editor content:', JSON.stringify(value, null, 2))
   }
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -44,31 +46,42 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
           mode: 'lowest'
         })
 
+        console.log('Enter pressed. Current node:', JSON.stringify(match, null, 2))
+        console.log('Consecutive empty enters:', consecutiveEmptyEnters)
+
         if (match) {
           const [node, path] = match
-          const range = Editor.range(editor, path)
-          const text = Editor.string(editor, range)
+          if (Element.isElement(node)) {
+            const range = Editor.range(editor, path)
+            const text = Editor.string(editor, range)
 
-          if (text.trim() === '') {
-            if (node.type === 'list-item') {
-              if (consecutiveEmptyEnters === 1) {
+            console.log('Node type:', node.type, 'Text:', text)
+
+            if (text.trim() === '') {
+              if (node.type === 'list-item') {
+                if (consecutiveEmptyEnters === 1) {
+                  console.log('Exiting list')
+                  EditorCommands.exitList(editor)
+                  setConsecutiveEmptyEnters(0)
+                } else {
+                  console.log('Inserting empty list item')
+                  EditorCommands.insertListItem(editor)
+                  setConsecutiveEmptyEnters(consecutiveEmptyEnters + 1)
+                }
+              } else {
                 EditorCommands.exitBlock(editor)
                 setConsecutiveEmptyEnters(0)
-              } else {
-                setConsecutiveEmptyEnters(consecutiveEmptyEnters + 1)
               }
             } else {
-              EditorCommands.exitBlock(editor)
+              if (node.type === 'quote') {
+                EditorCommands.insertParagraph(editor)
+              } else if (node.type === 'list-item') {
+                EditorCommands.insertListItem(editor)
+              } else {
+                Transforms.splitNodes(editor)
+              }
+              setConsecutiveEmptyEnters(0)
             }
-          } else {
-            if (node.type === 'quote') {
-              EditorCommands.insertParagraph(editor)
-            } else if (node.type === 'list-item') {
-              EditorCommands.toggleBlock(editor, 'list')
-            } else {
-              Transforms.splitNodes(editor)
-            }
-            setConsecutiveEmptyEnters(0)
           }
         } else {
           EditorCommands.insertParagraph(editor)
@@ -83,7 +96,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
 
       if (match && Editor.isStart(editor, selection.anchor, match[1])) {
         event.preventDefault()
-        EditorCommands.exitBlock(editor)
+        EditorCommands.exitList(editor)
       }
     } else if (event.key === '>' && selection && Range.isCollapsed(selection)) {
       const { anchor } = selection
@@ -106,9 +119,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
     } else if (event.key === '`' && event.ctrlKey && selection && Range.isCollapsed(selection)) {
       event.preventDefault()
       EditorCommands.toggleBlock(editor, 'code-block')
+    } else {
+      setConsecutiveEmptyEnters(0) // Reset the counter for any other key press
     }
-
-    setConsecutiveEmptyEnters(0)
   }
 
   const customDecorate = useCallback((entry: NodeEntry): BaseRange[] => {
