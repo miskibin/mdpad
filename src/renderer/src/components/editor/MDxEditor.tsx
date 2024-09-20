@@ -169,7 +169,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ initialContent, onConte
 
   return (
     <div className="w-full h-full flex flex-col">
-      <Slate editor={editor} value={editorValue} onChange={handleChange}>
+      <Slate editor={editor} initialValue={editorValue} onChange={handleChange}>
         <div className="flex-grow overflow-auto">
           <Editable
             decorate={customDecorate}

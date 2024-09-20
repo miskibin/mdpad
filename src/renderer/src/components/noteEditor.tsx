@@ -1,5 +1,5 @@
 import React from 'react'
-import MarkdownEditor from './MDxEditor'
+import MarkdownEditor from './editor/MDxEditor'
 
 interface Note {
   id: string
