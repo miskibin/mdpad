@@ -1,22 +1,30 @@
-import MarkdownRenderer from './MDxEditor'
+import React from 'react'
+import MarkdownEditor from './MDxEditor'
 
-type Note = {
+interface Note {
   id: string
   title: string
   content: string
 }
 
-type NoteEditorProps = {
+interface NoteEditorProps {
   note: Note
-  onNoteUpdate: (updatedNote: Note) => void
+  onUpdate: (id: string, updates: Partial<Note>) => void
 }
 
-
-export function NoteEditor({ note, onNoteUpdate }: NoteEditorProps) {
+export function NoteEditor({ note, onUpdate }: NoteEditorProps) {
+  const handleContentChange = (content: string) => {
+    const title = content.split('\n')[0].replace(/^# /, '') || 'Untitled'
+    onUpdate(note.id, { content, title })
+  }
 
   return (
-    <div className="flex-grow overflow-auto">
-      <MarkdownRenderer initialContent="# Hello\nThis is some **bold** and *italic* text." />
+    <div className="w-full h-[100vh]">
+      <MarkdownEditor
+        key={note.id}
+        initialContent={note.content}
+        onContentChange={handleContentChange}
+      />
     </div>
   )
 }

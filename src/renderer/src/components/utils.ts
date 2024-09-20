@@ -59,19 +59,46 @@ export const serialize = (nodes: Descendant[]): string => {
       if (Element.isElement(n)) {
         const text = n.children.map((c) => (Text.isText(c) ? c.text : '')).join('')
         switch (n.type) {
-          case 'quote': return `> ${text}\n`
-          case 'list-item': return `- ${text}\n`
+          case 'quote':
+            return `> ${text}\n`
+          case 'list-item':
+            return `- ${text}\n`
           case 'list':
             return n.children
-              .map((c) => Element.isElement(c) && c.type === 'list-item'
-                ? `- ${c.children.map((t) => (Text.isText(t) ? t.text : '')).join('')}\n`
-                : '')
+              .map((c) =>
+                Element.isElement(c) && c.type === 'list-item'
+                  ? `- ${c.children.map((t) => (Text.isText(t) ? t.text : '')).join('')}\n`
+                  : ''
+              )
               .join('')
-          case 'code-block': return `\`\`\`\n${text}\n\`\`\`\n`
-          default: return `${text}\n`
+          case 'code-block':
+            return `\`\`\`\n${text}\n\`\`\`\n`
+          default:
+            return `${text}\n`
         }
       }
       return ''
     })
     .join('')
+}
+
+export const deserialize = (content: string | undefined): Descendant[] | undefined => {
+  if (!content) return undefined
+
+  const lines = content.split('\n')
+  return lines.map((line) => {
+    if (line.startsWith('# ')) {
+      return { type: 'heading-1', children: [{ text: line.slice(2) }] }
+    } else if (line.startsWith('## ')) {
+      return { type: 'heading-2', children: [{ text: line.slice(3) }] }
+    } else if (line.startsWith('> ')) {
+      return { type: 'quote', children: [{ text: line.slice(2) }] }
+    } else if (line.startsWith('- ')) {
+      return { type: 'list-item', children: [{ text: line.slice(2) }] }
+    } else if (line.startsWith('```')) {
+      return { type: 'code-block', children: [{ text: line.slice(3) }] }
+    } else {
+      return { type: 'paragraph', children: [{ text: line }] }
+    }
+  })
 }

@@ -10,19 +10,36 @@ export type ListItemElement = { type: 'list-item'; children: CustomText[] }
 export type ListElement = { type: 'list'; children: ListItemElement[] }
 export type CodeBlockElement = { type: 'code-block'; children: CustomText[] }
 
-export type CustomElement = ParagraphElement | QuoteElement | ListItemElement | ListElement | CodeBlockElement
+export type CustomElement =
+  | ParagraphElement
+  | QuoteElement
+  | ListItemElement
+  | ListElement
+  | CodeBlockElement
 
-export type FormattedText = { text: string; bold?: boolean; italic?: boolean; code?: boolean }
+export type FormattedText = {
+  text: string
+  bold?: boolean
+  italic?: boolean
+  code?: boolean
+  heading?: boolean
+  level?: 1 | 2 | 3 | 4 | 5 | 6
+  link?: boolean
+  taskItem?: boolean
+}
+
 export type CustomText = FormattedText
 
 export interface CustomRange {
   anchor: { path: number[]; offset: number }
   focus: { path: number[]; offset: number }
   heading?: boolean
-  level?: number
+  level?: 1 | 2 | 3 | 4 | 5 | 6
   bold?: boolean
   italic?: boolean
   code?: boolean
+  link?: boolean
+  taskItem?: boolean
 }
 
 declare module 'slate' {

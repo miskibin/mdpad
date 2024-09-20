@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react'
+import React, { useMemo, useCallback, useState, useEffect } from 'react'
 import {
   createEditor,
   Descendant,
@@ -7,139 +7,198 @@ import {
   Editor,
   Range,
   NodeEntry,
-  BaseRange,
-  Node
+  BaseRange
 } from 'slate'
 import { Slate, Editable, withReact } from 'slate-react'
 import { withHistory } from 'slate-history'
-import { CustomEditor, initialValue } from './types'
-import { decorateNode, serialize } from './utils'
-import { renderElement } from './elements'
-import { renderLeaf } from './leafs'
-import { EditorCommands } from './editorcommands'
+import { CustomEditor } from './types'
+import { decorateNode, serialize, deserialize } from './utils'
+import { renderElement, renderLeaf } from './elements'
+import { EditorCommands } from './editorCommands'
 
 interface MarkdownEditorProps {
+  initialContent?: string
   onContentChange?: (content: string) => void
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ onContentChange }) => {
-  const editor = useMemo(() => withHistory(withReact(createEditor())) as CustomEditor, [])
+const defaultInitialValue: Descendant[] = [
+  {
+    type: 'paragraph',
+    children: [{ text: '' }],
+  },
+]
+
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ initialContent, onContentChange }) => {
+  const editor = useMemo(
+    () => withErrorBoundary(withHistory(withReact(createEditor()))) as CustomEditor,
+    []
+  )
   const [consecutiveEmptyEnters, setConsecutiveEmptyEnters] = useState(0)
 
-  const handleChange = (value: Descendant[]) => {
-    const content = serialize(value)
-    if (onContentChange) {
-      onContentChange(content)
-    }
-    console.log('Editor content:', JSON.stringify(value, null, 2))
-  }
+  const [editorValue, setEditorValue] = useState<Descendant[]>(() => 
+    deserialize(initialContent) || defaultInitialValue
+  )
 
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    const { selection } = editor
+  useEffect(() => {
+    setEditorValue(deserialize(initialContent) || defaultInitialValue)
+  }, [initialContent])
 
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      if (selection && Range.isCollapsed(selection)) {
-        const [match] = Editor.nodes(editor, {
-          match: (n) =>
-            Element.isElement(n) && ['list-item', 'quote', 'code-block'].includes(n.type),
-          mode: 'lowest'
-        })
+  const handleChange = useCallback(
+    (value: Descendant[]) => {
+      setEditorValue(value)
+      const content = serialize(value)
+      if (onContentChange) {
+        onContentChange(content)
+      }
+    },
+    [onContentChange]
+  )
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      try {
+        const { selection } = editor
 
-        console.log('Enter pressed. Current node:', JSON.stringify(match, null, 2))
-        console.log('Consecutive empty enters:', consecutiveEmptyEnters)
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          if (selection && Range.isCollapsed(selection)) {
+            const [match] = Editor.nodes(editor, {
+              match: (n) =>
+                !Editor.isEditor(n) &&
+                Element.isElement(n) &&
+                ['list-item', 'quote', 'code-block'].includes(n.type),
+              mode: 'lowest'
+            })
 
-        if (match) {
-          const [node, path] = match
-          if (Element.isElement(node)) {
-            const range = Editor.range(editor, path)
-            const text = Editor.string(editor, range)
+            console.log('Enter pressed. Current node:', JSON.stringify(match, null, 2))
+            console.log('Consecutive empty enters:', consecutiveEmptyEnters)
 
-            console.log('Node type:', node.type, 'Text:', text)
+            if (match) {
+              const [node, path] = match
+              if (Element.isElement(node)) {
+                const range = Editor.range(editor, path)
+                const text = Editor.string(editor, range)
 
-            if (text.trim() === '') {
-              if (node.type === 'list-item') {
-                if (consecutiveEmptyEnters === 1) {
-                  console.log('Exiting list')
-                  EditorCommands.exitList(editor)
-                  setConsecutiveEmptyEnters(0)
+                console.log('Node type:', node.type, 'Text:', text)
+
+                if (text.trim() === '') {
+                  if (node.type === 'list-item') {
+                    if (consecutiveEmptyEnters === 1) {
+                      console.log('Exiting list')
+                      EditorCommands.exitList(editor)
+                      setConsecutiveEmptyEnters(0)
+                    } else {
+                      console.log('Inserting empty list item')
+                      EditorCommands.insertListItem(editor)
+                      setConsecutiveEmptyEnters(1)
+                    }
+                  } else {
+                    EditorCommands.exitBlock(editor)
+                    setConsecutiveEmptyEnters(0)
+                  }
                 } else {
-                  console.log('Inserting empty list item')
-                  EditorCommands.insertListItem(editor)
-                  setConsecutiveEmptyEnters(consecutiveEmptyEnters + 1)
+                  if (node.type === 'quote') {
+                    EditorCommands.insertParagraph(editor)
+                  } else if (node.type === 'list-item') {
+                    EditorCommands.insertListItem(editor)
+                  } else {
+                    Transforms.splitNodes(editor)
+                  }
+                  setConsecutiveEmptyEnters(0)
                 }
-              } else {
-                EditorCommands.exitBlock(editor)
-                setConsecutiveEmptyEnters(0)
               }
             } else {
-              if (node.type === 'quote') {
-                EditorCommands.insertParagraph(editor)
-              } else if (node.type === 'list-item') {
-                EditorCommands.insertListItem(editor)
-              } else {
-                Transforms.splitNodes(editor)
-              }
+              EditorCommands.insertParagraph(editor)
               setConsecutiveEmptyEnters(0)
             }
           }
-        } else {
-          EditorCommands.insertParagraph(editor)
-          setConsecutiveEmptyEnters(0)
-        }
-      }
-    } else if (event.key === 'Backspace' && selection && Range.isCollapsed(selection)) {
-      const [match] = Editor.nodes(editor, {
-        match: (n) => Element.isElement(n) && n.type === 'list-item',
-        mode: 'lowest'
-      })
+        } else if (event.key === 'Backspace' && selection && Range.isCollapsed(selection)) {
+          const [match] = Editor.nodes(editor, {
+            match: (n) => !Editor.isEditor(n) && Element.isElement(n) && n.type === 'list-item',
+            mode: 'lowest'
+          })
 
-      if (match && Editor.isStart(editor, selection.anchor, match[1])) {
-        event.preventDefault()
-        EditorCommands.exitList(editor)
+          if (match && Editor.isStart(editor, selection.anchor, match[1])) {
+            event.preventDefault()
+            EditorCommands.exitList(editor)
+          }
+        } else if (event.key === '>' && selection && Range.isCollapsed(selection)) {
+          const { anchor } = selection
+          const block = Editor.above(editor, {
+            match: (n) => !Editor.isEditor(n) && Element.isElement(n) && Editor.isBlock(editor, n)
+          })
+          if (block && Editor.isStart(editor, anchor, block[1])) {
+            event.preventDefault()
+            EditorCommands.toggleBlock(editor, 'quote')
+          }
+        } else if (event.key === '-' && selection && Range.isCollapsed(selection)) {
+          const { anchor } = selection
+          const block = Editor.above(editor, {
+            match: (n) => !Editor.isEditor(n) && Element.isElement(n) && Editor.isBlock(editor, n)
+          })
+          if (block && Editor.isStart(editor, anchor, block[1])) {
+            event.preventDefault()
+            EditorCommands.toggleBlock(editor, 'list')
+          }
+        } else if (
+          event.key === '`' &&
+          event.ctrlKey &&
+          selection &&
+          Range.isCollapsed(selection)
+        ) {
+          event.preventDefault()
+          EditorCommands.toggleBlock(editor, 'code-block')
+        } else {
+          setConsecutiveEmptyEnters(0) // Reset the counter for any other key press
+        }
+      } catch (error) {
+        console.error('Error in handleKeyDown:', error)
+        // Optionally, reset the editor state or take other recovery actions
       }
-    } else if (event.key === '>' && selection && Range.isCollapsed(selection)) {
-      const { anchor } = selection
-      const block = Editor.above(editor, {
-        match: (n) => Element.isElement(n) && Editor.isBlock(editor, n)
-      })
-      if (block && Editor.isStart(editor, anchor, block[1])) {
-        event.preventDefault()
-        EditorCommands.toggleBlock(editor, 'quote')
-      }
-    } else if (event.key === '-' && selection && Range.isCollapsed(selection)) {
-      const { anchor } = selection
-      const block = Editor.above(editor, {
-        match: (n) => Element.isElement(n) && Editor.isBlock(editor, n)
-      })
-      if (block && Editor.isStart(editor, anchor, block[1])) {
-        event.preventDefault()
-        EditorCommands.toggleBlock(editor, 'list')
-      }
-    } else if (event.key === '`' && event.ctrlKey && selection && Range.isCollapsed(selection)) {
-      event.preventDefault()
-      EditorCommands.toggleBlock(editor, 'code-block')
-    } else {
-      setConsecutiveEmptyEnters(0) // Reset the counter for any other key press
-    }
-  }
+    },
+    [editor, consecutiveEmptyEnters]
+  )
 
   const customDecorate = useCallback((entry: NodeEntry): BaseRange[] => {
-    return decorateNode(entry as [Descendant, number[]]) as BaseRange[]
+    try {
+      return decorateNode(entry as [Descendant, number[]]) as BaseRange[]
+    } catch (error) {
+      console.error('Error in customDecorate:', error)
+      return []
+    }
   }, [])
 
   return (
-    <Slate editor={editor} initialValue={initialValue} onChange={handleChange}>
-      <Editable
-        decorate={customDecorate}
-        renderElement={renderElement}
-        renderLeaf={renderLeaf}
-        onKeyDown={handleKeyDown}
-        placeholder="Dear diary..."
-        className="w-full p-4 border rounded text-gray-900 dark:text-gray-100 overflow-x-clip outline-none min-h-[100px] focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
-      />
-    </Slate>
+    <div className="w-full h-full flex flex-col">
+      <Slate editor={editor} value={editorValue} onChange={handleChange}>
+        <div className="flex-grow overflow-auto">
+          <Editable
+            decorate={customDecorate}
+            renderElement={renderElement}
+            renderLeaf={renderLeaf}
+            onKeyDown={handleKeyDown}
+            placeholder="Dear diary..."
+            className="w-full h-full p-4 text-foreground outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
+          />
+        </div>
+      </Slate>
+    </div>
   )
+}
+
+// Custom plugin to add error boundary to editor operations
+const withErrorBoundary = (editor: Editor) => {
+  const { apply } = editor
+
+  editor.apply = (operation) => {
+    try {
+      apply(operation)
+    } catch (error) {
+      console.error('Error applying operation:', error, operation)
+      // Optionally, you could try to recover here, e.g., by resetting the editor state
+    }
+  }
+
+  return editor
 }
 
 export default MarkdownEditor
