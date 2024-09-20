@@ -176,7 +176,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ initialContent, onConte
             renderElement={renderElement}
             renderLeaf={renderLeaf}
             onKeyDown={handleKeyDown}
-            placeholder="Dear diary..."
             className="w-full h-full p-4 text-foreground outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors duration-200"
           />
         </div>

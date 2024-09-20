@@ -23,9 +23,10 @@ export default function App() {
           onNoteDelete={deleteNote}
           onThemeToggle={toggleTheme}
         />
-        {activeNote ? (
-          <NoteEditor note={activeNote} onUpdate={updateNote} />
-        ) : (
+        <div className="flex-1 overflow-hidden">
+          {activeNote ? (
+            <NoteEditor note={activeNote} onUpdate={updateNote} />
+          ) : (
             <div className="flex items-center justify-center h-full w-full bg-background text-foreground">
               <div className="text-center">
                 <FileText className="w-24 h-24 mx-auto mb-6 text-muted-foreground" />
@@ -35,7 +36,8 @@ export default function App() {
                 </p>
               </div>
             </div>
-        )}
+          )}
+        </div>
       </div>
     </ThemeProvider>
   )
