@@ -1,45 +1,20 @@
-import React, { useState } from 'react'
-import { ScrollArea } from './ui/scroll-area'
-import { Button } from './ui/button'
-import { Plus, Moon, Sun, ChevronLeft, ChevronRight, FileText, MoreHorizontal } from 'lucide-react'
-import { useTheme } from '../hooks/useTheme'
+import React, { useState } from 'react';
+import { ScrollArea } from './ui/scroll-area';
+import { Button } from './ui/button';
+import { Plus, Moon, Sun, ChevronLeft, ChevronRight, FileText, MoreHorizontal } from 'lucide-react';
+import { useNoteContext } from '../NoteContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from './ui/dropdown-menu'
+} from './ui/dropdown-menu';
 
-type Note = {
-  id: string
-  title: string
-}
+export function Sidebar() {
+  const { notes, activeNoteId, setActiveNoteId, createNote, updateNote, deleteNote, theme, toggleTheme } = useNoteContext();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-type SidebarProps = {
-  notes: Note[]
-  activeNoteId: string | null
-  onNoteSelect: (noteId: string) => void
-  onNoteCreate: () => void
-  onNoteDelete: (noteId: string) => void
-  onNoteRename: (noteId: string, newTitle: string) => void
-  onNoteDuplicate: (noteId: string) => void
-  onThemeToggle: () => void
-}
-
-export function Sidebar({
-  notes,
-  activeNoteId,
-  onNoteSelect,
-  onNoteCreate,
-  onNoteDelete,
-  onNoteRename,
-  onNoteDuplicate,
-  onThemeToggle
-}: SidebarProps) {
-  const { theme } = useTheme()
-  const [isCollapsed, setIsCollapsed] = useState(false)
-
-  const toggleSidebar = () => setIsCollapsed(!isCollapsed)
+  const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
   return (
     <div
@@ -66,7 +41,7 @@ export function Sidebar({
                 ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100'
                 : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-100'
             }`}
-            onClick={() => onNoteSelect(note.id)}
+            onClick={() => setActiveNoteId(note.id)}
           >
             <FileText className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : 'mr-2'}`} />
             {!isCollapsed && (
@@ -83,13 +58,13 @@ export function Sidebar({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => onNoteRename(note.id, 'New Title')}>
+                    <DropdownMenuItem onClick={() => updateNote(note.id, { title: 'New Title' })}>
                       Rename
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onNoteDuplicate(note.id)}>
+                    <DropdownMenuItem onClick={() => createNote()}>
                       Duplicate
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onNoteDelete(note.id)}>
+                    <DropdownMenuItem onClick={() => deleteNote(note.id)}>
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -102,7 +77,7 @@ export function Sidebar({
       <div className="p-2 flex justify-between items-center">
         <Button
           className={`${isCollapsed ? 'w-full p-1' : 'px-2 py-1'} bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-100`}
-          onClick={onNoteCreate}
+          onClick={createNote}
         >
           <Plus className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : 'mr-2'}`} />
           {!isCollapsed && <span className="text-sm">New Note</span>}
@@ -111,7 +86,7 @@ export function Sidebar({
           <Button
             variant="ghost"
             size="sm"
-            onClick={onThemeToggle}
+            onClick={toggleTheme}
             className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800"
           >
             {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
@@ -119,5 +94,5 @@ export function Sidebar({
         )}
       </div>
     </div>
-  )
+  );
 }

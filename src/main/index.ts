@@ -2,7 +2,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { BrowserWindow, app, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
-import { createNote, deleteNote, getNotes, readNote, writeNote } from './lib'
+// import { createNote, deleteNote, getNotes, readNote, writeNote } from './lib'
 import { CreateNote, DeleteNote, GetNotes, ReadNote, WriteNote } from '../shared/types'
 
 function createWindow(): void {
@@ -13,7 +13,7 @@ function createWindow(): void {
     // autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     center: true,
-    title: 'NoteMark',
+    title: 'mdpad',
     // frame: false,
     vibrancy: 'under-window',
     visualEffectState: 'active',

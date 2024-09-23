@@ -10,6 +10,7 @@ const getNotesDir = () => {
 
 export const getNotes: GetNotes = async () => {
   const notesDir = getNotesDir()
+  console.log('getNotes', notesDir)
   await fs.mkdir(notesDir, { recursive: true })
   const files = await fs.readdir(notesDir)
   const notes = await Promise.all(
@@ -31,11 +32,13 @@ export const readNote: ReadNote = async (id) => {
   const filePath = path.join(notesDir, `${id}.md`)
   const content = await fs.readFile(filePath, 'utf-8')
   const title = content.split('\n')[0].replace(/^# /, '') || 'Untitled'
+  console.log('readNote', id, title, content)
   return { id, title, content }
 }
 
 export const writeNote: WriteNote = async (note) => {
   const notesDir = getNotesDir()
+  console.log('writeNote', note.content)  
   const filePath = path.join(notesDir, `${note.id}.md`)
   await fs.writeFile(filePath, note.content)
 }

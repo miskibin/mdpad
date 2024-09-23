@@ -1,22 +1,24 @@
-import React from 'react'
-import MarkdownEditor from './editor/MDxEditor'
+import React from 'react';
+import MarkdownEditor from './editor/MDxEditor';
+import { useNoteContext } from '../NoteContext';
 
 interface Note {
-  id: string
-  title: string
-  content: string
+  id: string;
+  title: string;
+  content: string;
 }
 
 interface NoteEditorProps {
-  note: Note
-  onUpdate: (id: string, updates: Partial<Note>) => void
+  note: Note;
 }
 
-export function NoteEditor({ note, onUpdate }: NoteEditorProps) {
+export function NoteEditor({ note }: NoteEditorProps) {
+  const { updateNote } = useNoteContext();
+
   const handleContentChange = (content: string) => {
-    const title = content.split('\n')[0].replace(/^# /, '') || 'Untitled'
-    onUpdate(note.id, { content, title })
-  }
+    const title = content.split('\n')[0].replace(/^# /, '') || 'Untitled';
+    updateNote(note.id, { content, title });
+  };
 
   return (
     <div className="w-full h-[100vh]">
@@ -26,5 +28,5 @@ export function NoteEditor({ note, onUpdate }: NoteEditorProps) {
         onContentChange={handleContentChange}
       />
     </div>
-  )
+  );
 }
