@@ -1,68 +1,98 @@
-import React from 'react'
-import { ScrollArea } from './ui/scroll-area'
-import { Button } from './ui/button'
-import { Plus, Moon, Sun, Trash } from 'lucide-react'
-import { useTheme } from '../hooks/useTheme'
+import React, { useState } from 'react';
+import { ScrollArea } from './ui/scroll-area';
+import { Button } from './ui/button';
+import { Plus, Moon, Sun, ChevronLeft, ChevronRight, FileText, MoreHorizontal } from 'lucide-react';
+import { useNoteContext } from '../NoteContext';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
-type Note = {
-  id: string
-  title: string
-}
+export function Sidebar() {
+  const { notes, activeNoteId, setActiveNoteId, createNote, updateNote, deleteNote, theme, toggleTheme } = useNoteContext();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-type SidebarProps = {
-  notes: Note[]
-  activeNoteId: string | null
-  onNoteSelect: (noteId: string) => void
-  onNoteCreate: () => void
-  onNoteDelete: (noteId: string) => void
-  onThemeToggle: () => void
-}
-
-export function Sidebar({
-  notes,
-  activeNoteId,
-  onNoteSelect,
-  onNoteCreate,
-  onNoteDelete,
-  onThemeToggle
-}: SidebarProps) {
-  const { theme } = useTheme()
+  const toggleSidebar = () => setIsCollapsed(!isCollapsed);
 
   return (
-    <div className="w-64 border-r border-border bg-background flex flex-col">
-      <div className="p-4 flex justify-between items-center">
-        <h1 className="text-lg font-semibold">Notes</h1>
-        <Button variant="ghost" size="icon" onClick={onThemeToggle}>
-          {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+    <div
+      className={`${
+        isCollapsed ? 'w-14' : 'w-60'
+      } border-r border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900 flex flex-col transition-all duration-300`}
+    >
+      <div className="p-2 flex justify-end items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800"
+        >
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
-      <ScrollArea className="flex-grow">
+      <ScrollArea className="flex-grow px-1">
         {notes.map((note) => (
           <div
             key={note.id}
-            className={`flex items-center justify-between p-2 cursor-pointer ${
-              activeNoteId === note.id ? 'bg-accent' : 'hover:bg-accent/50'
+            className={`group flex items-center py-1 px-2 rounded cursor-pointer ${
+              activeNoteId === note.id
+                ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-100'
+                : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-100'
             }`}
-            onClick={() => onNoteSelect(note.id)}
+            onClick={() => setActiveNoteId(note.id)}
           >
-            <span className="truncate flex-1">{note.title}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation()
-                onNoteDelete(note.id)
-              }}
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
+            <FileText className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : 'mr-2'}`} />
+            {!isCollapsed && (
+              <>
+                <span className="truncate flex-1 text-sm">{note.title}</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="opacity-0 group-hover:opacity-100 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-100"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => updateNote(note.id, { title: 'New Title' })}>
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => createNote()}>
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => deleteNote(note.id)}>
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
         ))}
       </ScrollArea>
-      <Button className="m-4" onClick={onNoteCreate}>
-        <Plus className="h-4 w-4 mr-2" />
-        New Note
-      </Button>
+      <div className="p-2 flex justify-between items-center">
+        <Button
+          className={`${isCollapsed ? 'w-full p-1' : 'px-2 py-1'} bg-transparent hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-100`}
+          onClick={createNote}
+        >
+          <Plus className={`h-4 w-4 ${isCollapsed ? 'mx-auto' : 'mr-2'}`} />
+          {!isCollapsed && <span className="text-sm">New Note</span>}
+        </Button>
+        {!isCollapsed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-800"
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
+        )}
+      </div>
     </div>
-  )
+  );
 }
